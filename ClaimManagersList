@@ -1,5 +1,5 @@
 //sub contract for claim managers list
-pragma solidity ^0.4.0;
+pragma solidity ^0.5.1;
 contract ClaimManagersList {
     
     enum ClaimStatus {Accepted, Rejected, InProgress}
@@ -49,7 +49,7 @@ contract ClaimManagersList {
     }
     
     ///check if _add is a manager
-    function checkClaimManager (address _add) private constant returns (bool _isClaimManager) {
+    function checkClaimManager (address _add) private view returns (bool _isClaimManager) {
         _isClaimManager = false;
         for (uint256 i = 0; i < claimManagers.length; i++) {
             if (claimManagers[i].personAddress == _add) {
@@ -59,13 +59,13 @@ contract ClaimManagersList {
         }
     }
     
-    function returnFirstProposedManager () public constant returns (bytes _url) {
+    function returnFirstProposedManager () public view returns (bytes memory) {
         require(proposedClaimManagers.length > 0);
         require(checkClaimManager(msg.sender));
-        _url = proposedClaimManagers[0].personURL;
+        return proposedClaimManagers[0].personURL;
     }
     
-    function proposeNewManager(bytes _url, address _add) public payable {
+    function proposeNewManager(bytes memory _url, address _add) public payable {
         require(msg.value >= claimDeposit);
         require(checkClaimManager(msg.sender));
         require(!checkClaimManager(_add));
@@ -74,7 +74,7 @@ contract ClaimManagersList {
             votesPro: 0, votesContra: 0, personAddress: _add}));
     }
     
-    function voteForProposedManager(bytes _url, bool _vote) public {
+    function voteForProposedManager(bytes memory _url, bool _vote) public {
         require(checkClaimManager(msg.sender));
         require(keccak256(_url) == keccak256(returnFirstProposedManager()));
         if (_vote) proposedClaimManagers[0].votesPro++; //always votes for first promoted manager
@@ -94,7 +94,7 @@ contract ClaimManagersList {
     function rejectProposedManager() private {
         for (uint256 i = 0; i < proposedClaimManagers.length; i++)
             proposedClaimManagers[i] = proposedClaimManagers[i + 1];
-        delete proposedClaimManagers[i];
+        delete proposedClaimManagers[proposedClaimManagers.length];
         proposedClaimManagers.length--;
     }
     
@@ -122,11 +122,11 @@ contract ClaimManagersList {
     }
     */
     
-    function returnLengthOfList () public constant returns (uint256) {
+    function returnLengthOfList () public view returns (uint256) {
         return claimManagers.length;
     }
     
-    function returnManagerAddress (uint256 _num) public constant returns (address) {
+    function returnManagerAddress (uint256 _num) public view returns (address) {
         require(_num<claimManagers.length);
         return claimManagers[_num].personAddress;
     }
