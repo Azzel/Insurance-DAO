@@ -13,6 +13,7 @@ contract("InsuranceDAO", accounts => {
     var manager2Url = "thirdAccountUrl";
     
     var claimUrl1 = "claimOneUrl";
+    var claimUrl2 = "claimTwoUrl";
     
     var insuranceDao;
     var minSumAssured = 1;
@@ -107,25 +108,47 @@ contract("InsuranceDAO", accounts => {
     describe("apply new claim process", function() {
     
         it("apply new claim", async () => {
-            await increaseTime(15*DAY);
-            await insuranceDao.applyNewClaim(10*claimDeposit, claimUrl1, claimDeposit, { from: firstAccount, value: claimDeposit * FINNEY });
-            assert.equal(await insuranceDao.returnFirstAppliedClaimFolderURL({ from: firstAccount }), claimUrl1, "after apply first usettled claim url ok");
-            
+            await increaseTime(20 * DAY);
+            //const startDate = await insuranceDao.returnStartDateOfCurrentContract({ from: firstAccount });
+            //console.log(startDate);
+            //console.log(startDate + 20 * DAY);
+            await insuranceDao.applyNewClaim(10 * claimDeposit, claimUrl1, /*20 * DAY,*/ { from: firstAccount, value: claimDeposit * FINNEY });
+            assert.equal(await insuranceDao.returnFirstAppliedClaimFolderURL({ from: firstAccount }), claimUrl1, "after apply first usettled claim url firstAccount ok");
+            assert.equal(await insuranceDao.returnFirstAppliedClaimFolderURL({ from: secondAccount }), claimUrl1, "after apply first usettled claim url secondAccount ok");
+            assert.equal(await insuranceDao.returnStatusOfClaimNum(0), 2, "after apply #0 claim its status = 2 (InProgress)");
         });
     
         it("reject claim", async () => {
             await insuranceDao.voteForClaimFolder(claimUrl1, false, { from: firstAccount});
             await insuranceDao.voteForClaimFolder(claimUrl1, false, { from: secondAccount});
-            //how to check?
-            //assert.equal(await insuranceDao.returnFirstAppliedClaimFolderURL({ from: firstAccount }), claimUrl1, "after apply first usettled claim url ok");
-            
+            assert.equal(await insuranceDao.returnStatusOfClaimNum(0), 1, "after reject #0 claim its status = Rejected (1)");
         });
         
-        it("apply new claim (again)");
+        it("apply new claim (again)", async () => {
+            //await increaseTime(20 * DAY);
+            await insuranceDao.applyNewClaim(10 * claimDeposit, claimUrl2, /*20 * DAY,*/ { from: firstAccount, value: claimDeposit * FINNEY });
+            assert.equal(await insuranceDao.returnFirstAppliedClaimFolderURL({ from: firstAccount }), claimUrl2, "after apply first usettled claim url firstAccount ok");
+            assert.equal(await insuranceDao.returnFirstAppliedClaimFolderURL({ from: secondAccount }), claimUrl2, "after apply first usettled claim url secondAccount ok");
+            assert.equal(await insuranceDao.returnStatusOfClaimNum(1), 2, "after apply #1 claim its status = 2 (InProgress)");
+        });
         
-        it("vote for claim");
+        it("approve the claim", async () => {
+            await insuranceDao.voteForClaimFolder(claimUrl2, true, { from: firstAccount});
+            await insuranceDao.voteForClaimFolder(claimUrl2, true, { from: secondAccount});
+            assert.equal(await insuranceDao.returnStatusOfClaimNum(0), 1, "after accept #1 claim its status = 0 (Accepted)");
+        });
         
-        it("get refund for claim");
+        it("get refund for claim", async () => {
+            const initBalance = await web3.eth.getBalance(firstAccount);
+            console.log(web3.utils.fromWei(await web3.eth.getBalance(firstAccount), "finney"));
+            
+            await insuranceDao.withdrawClaimSettlement({ from: firstAccount });
+            
+            const finalBalance = await web3.eth.getBalance(firstAccount);
+            console.log(web3.utils.fromWei(await web3.eth.getBalance(firstAccount), "finney"));
+            
+            assert.ok(web3.utils.fromWei(finalBalance, "ether") > web3.utils.fromWei(initBalance, "ether"), "after claim refund balance should be greater");
+        });
     
     });
     
