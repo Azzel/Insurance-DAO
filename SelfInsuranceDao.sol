@@ -138,9 +138,9 @@ contract SelfInsuranceDao {
     
     //*** group of function to make and process claim
     
-    function applyNewClaim (/*string _vin,*/ uint _claimAmount, string memory _claimURL, uint _claimDate) public payable {
+    function applyNewClaim (/*string _vin,*/ uint _claimAmount, string memory _claimURL /*,  uint _claimDate*/) public payable {
         
-        uint256 _contractNum = returnActiveContractByAddressNum(msg.sender, _claimDate); //returnInsuranceContractByVinNum(_vin);
+        uint256 _contractNum = returnActiveContractByAddressNum(msg.sender, now); //_claimDate //returnInsuranceContractByVinNum(_vin);
         require(_contractNum > 0);
         _contractNum--;
         require(msg.sender == insuranceContracts[_contractNum].owner);
@@ -148,7 +148,7 @@ contract SelfInsuranceDao {
         uint256 l = claimManagersList.returnLengthOfList();
         
         //comment for immidiate test
-        require(insuranceContracts[_contractNum].startDate + NTUTermInDays < now); //accept claims only after NTUTermInDays
+        require(insuranceContracts[_contractNum].startDate + NTUTermInDays <= now); //accept claims only after NTUTermInDays
         
         //populate list of claimFolderManagers
         address[numberOfClaimFolderManagers] memory _managers;
@@ -157,6 +157,8 @@ contract SelfInsuranceDao {
         uint256 h; 
         bool alreadyIn = false; //if choosen manager already selected
         address _add;
+        
+        
         //make simple select if managers count == numberOfClaimFolderManagers?
         if (l <= numberOfClaimFolderManagers) {//if number of active managers less then nominal number for settlement
             for (i = 0; i < l; i++) {
@@ -178,6 +180,7 @@ contract SelfInsuranceDao {
                 i++;
             }
         
+        
         adminFee += msg.value;
         
         claimFolders.push(ClaimFolder ({
@@ -186,7 +189,7 @@ contract SelfInsuranceDao {
             claimAmount: _claimAmount * 1 finney, //temp nominated in finney
             managers: _managers,
             //claimApplicationDate: now,
-            claimDate: _claimDate,
+            claimDate: now, //_claimDate,
             votesPro: 0,
             votesContra: 0,
             amountToSettle: 0,
@@ -227,20 +230,24 @@ contract SelfInsuranceDao {
         
         if (_vote) claimFolders[_numClaimFolder].votesPro++;
         else claimFolders[_numClaimFolder].votesContra++;
+        
+        /*
         for (uint i = 0; i < claimFolders[i].managers.length; i++) {
             if (claimFolders[_numClaimFolder].managers[i] == msg.sender) 
-                delete claimFolders[_numClaimFolder].managers[i]; //delete manager after vote. but length remain the same?
+                delete claimFolders[_numClaimFolder].managers[i]; //delete manager after vote. but length remain the same? not working
         }
+        */
+        
         
         //check if 1/2 of total votes already pro or contra this claim and update status
-        if (claimFolders[_numClaimFolder].votesPro >= claimFolders[_numClaimFolder].managers.length/2) {
+        if (claimFolders[_numClaimFolder].votesPro * 2 >= claimFolders[_numClaimFolder].managers.length) {
             claimFolders[_numClaimFolder].status = ClaimStatus.Accepted;
             uint _claimAmount = claimFolders[_numClaimFolder].claimAmount;
             address _add = insuranceContracts[claimFolders[_numClaimFolder].contractNum].owner;
             claimFolders[_numClaimFolder].amountToSettle = collectSumFromReserves(_claimAmount, _add);
             //claimManagersList.updateCountOfPassedClaimsByManager(keccak256(msg.sender), uint(ClaimStatus.Accepted));
         }
-        if (claimFolders[_numClaimFolder].votesContra > claimFolders[_numClaimFolder].managers.length/2) {
+        if (claimFolders[_numClaimFolder].votesContra * 2 > claimFolders[_numClaimFolder].managers.length) {
             claimFolders[_numClaimFolder].status = ClaimStatus.Rejected;
             //claimManagersList.updateCountOfPassedClaimsByManager(keccak256(msg.sender), uint(ClaimStatus.Rejected));
         }
@@ -248,6 +255,7 @@ contract SelfInsuranceDao {
     
     function collectSumFromReserves(uint _claimAmount, address _add) private returns (uint256 _amountToTransfer) {
         _amountToTransfer = 0;
+        
         uint256 _amount;
         uint fineX = 4; //aditional multiplyer for claimant and it's parent
         uint _tmpFineX = 1;
@@ -272,7 +280,8 @@ contract SelfInsuranceDao {
                 _amountToTransfer += _amount;
             }
             i--; //next member
-        }    
+        }   
+        
         return _amountToTransfer;
     }
     
@@ -387,6 +396,22 @@ contract SelfInsuranceDao {
     
     function returnNumberOfContracts() public view returns (uint256) {
         return insuranceContracts.length;
+    }
+    
+    function returnNumberOfClaims() public view returns (uint256) {
+        return insuranceContracts.length;
+    }
+    
+    function returnStatusOfClaimNum(uint _numClaimFolder) public view returns (uint) {
+        return uint(claimFolders[_numClaimFolder].status);
+    }
+    
+    function returnStartDateOfCurrentContract () public view returns (uint256) {
+        uint256 _contractNum = returnActiveContractByAddressNum(msg.sender, now);
+        require(_contractNum > 0);
+        _contractNum--; //reduce by 1 to return to "array" numeration
+        
+        return insuranceContracts[_contractNum].startDate;
     }
     
     //***
